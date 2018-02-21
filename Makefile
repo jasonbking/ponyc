@@ -31,6 +31,10 @@ else
     OSTYPE = bsd
     CXX = c++
   endif
+
+  ifeq ($(UNAME_S),SunOS)
+    OSTYPE = illumos
+  endif
 endif
 
 ifdef LTO_PLUGIN
@@ -249,6 +253,8 @@ ifndef LLVM_CONFIG
     LLVM_CONFIG = /opt/llvm-5.0.0/bin/llvm-config
   else ifneq (,$(shell which /opt/llvm-4.0.0/bin/llvm-config 2> /dev/null))
     LLVM_CONFIG = /opt/llvm-4.0.0/bin/llvm-config
+  else ifneq (,$(shell which /opt/local/bin/llvm-config 2> /dev/null))
+    LLVM_CONFIG = /opt/local/bin/llvm-config
   else
     $(error No LLVM installation found!)
   endif
@@ -294,7 +300,7 @@ else ifeq ($(llvm_version),6.0.0)
 else ifeq ($(llvm_version),6.0.1)
   $(warning WARNING: LLVM 6 support is experimental and may result in decreased performance or crashes)
 else
-  $(warning WARNING: Unsupported LLVM version: $(llvm_version))
+  $(warning WARNING: Unsupported LLVM version: $(LLVM_CONFIG) $(llvm_version))
   $(warning Please use LLVM 3.9.1)
 endif
 
@@ -371,6 +377,10 @@ ifneq ($(OSTYPE),osx)
   ifneq ($(OSTYPE),bsd)
     libponyrt.except += src/libponyrt/asio/kqueue.c
   endif
+endif
+
+ifneq ($(OSTYPE),illumos)
+  libponyrt.except += src/libponyrt/asio/evport.c
 endif
 
 libponyrt.except += src/libponyrt/asio/sock.c
@@ -475,6 +485,11 @@ libblake2.include := -isystem lib/blake2/
 
 ifneq (,$(filter $(OSTYPE), osx bsd))
   libponyrt.include += -I /usr/local/include
+endif
+
+ifeq ($(OSTYPE),illumos)
+  ponyc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
+  libponyrt.buildoptions += -D_POSIX_PTHREAD_SEMANTICS
 endif
 
 # target specific build options

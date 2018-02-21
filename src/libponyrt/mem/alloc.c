@@ -35,6 +35,9 @@ void* ponyint_virt_alloc(size_t bytes)
 #elif defined(PLATFORM_IS_BSD)
   p = mmap(0, bytes, PROT_READ | PROT_WRITE,
     MAP_PRIVATE | MAP_ANON | MAP_ALIGNED_SUPER, -1, 0);
+#elif defined(PLATFORM_IS_ILLUMOS)
+  p = mmap(0, bytes, PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANON, -1, 0);
 #endif
   if(p == MAP_FAILED)
     ok = false;

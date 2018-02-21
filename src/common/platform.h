@@ -98,11 +98,13 @@
 #  define WIN32_LEAN_AND_MEAN
 #  define NOMINMAX
 #  include <Windows.h>
+#elif defined(__sun)
+#  define PLATFORM_IS_ILLUMOS
 #else
 #  error PLATFORM NOT SUPPORTED!
 #endif
 
-#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_LINUX) || defined (PLATFORM_IS_BSD)
+#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_LINUX) || defined (PLATFORM_IS_BSD) || defined(PLATFORM_IS_ILLUMOS)
 #  define PLATFORM_IS_POSIX_BASED
 #endif
 

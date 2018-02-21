@@ -154,7 +154,11 @@ PONY_API int ponyint_o_trunc()
 
 PONY_API int ponyint_o_directory()
 {
+#if defined(PLATFORM_IS_ILLUMOS)
+  return 0;
+#else
   return O_DIRECTORY;
+#endif
 }
 
 PONY_API int ponyint_o_cloexec()
@@ -180,7 +184,7 @@ PONY_API const char* ponyint_unix_readdir(DIR* dir)
     if(d == NULL)
       break;
 
-#if defined(PLATFORM_IS_LINUX)
+#if defined(PLATFORM_IS_LINUX) || defined(PLATFORM_IS_ILLUMOS)
     size_t len = strlen(d->d_name);
 #elif defined(PLATFORM_IS_BSD) || defined(PLATFORM_IS_MACOSX)
     size_t len = d->d_namlen;

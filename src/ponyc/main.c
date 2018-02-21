@@ -19,6 +19,10 @@
 #  include <unistd.h>
 #endif
 
+#ifdef PLATFORM_IS_ILLUMOS
+#  include <termio.h>
+#endif
+
 static size_t get_width()
 {
   size_t width = 80;

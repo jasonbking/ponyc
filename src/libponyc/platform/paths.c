@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#elif defined(PLATFORM_IS_ILLUMOS)
+#include <stdlib.h>
 #endif
 
 #ifdef PLATFORM_IS_WINDOWS
@@ -245,6 +247,14 @@ bool get_compiler_exe_path(char* output_path)
   if(success)
   {
     pony_realpath(exec_path, output_path);
+  }
+#elif defined PLATFORM_IS_ILLUMOS
+  const char *exec_path = getexecname();
+
+  if (exec_path != NULL)
+  {
+     success = true;
+     pony_realpath(exec_path, output_path);
   }
 #else
 #  error Unsupported platform for exec_path()
