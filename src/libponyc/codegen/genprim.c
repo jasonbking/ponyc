@@ -1205,6 +1205,18 @@ static void platform_windows(compile_t* c, reach_type_t* t, token_id cap)
   codegen_finishfun(c);
 }
 
+static void platform_illumos(compile_t* c, reach_type_t* t, token_id cap)
+{
+  FIND_METHOD("illumos", cap);
+  start_function(c, t, m, c->i1, &c_t->use_type, 1);
+
+  LLVMValueRef result =
+    LLVMConstInt(c->i1, target_is_illumos(c->opt->triple), false);
+  LLVMBuildRet(c->builder, result);
+  codegen_finishfun(c);
+}
+
+static void platform_x86(compile_t* c, reach_type_t* t, token_id cap)
 static void platform_x86(compile_t* c, reach_type_t* t, token_id cap)
 {
   FIND_METHOD("x86", cap);
@@ -1310,6 +1322,7 @@ void genprim_platform_methods(compile_t* c, reach_type_t* t)
   BOX_FUNCTION(platform_linux, t);
   BOX_FUNCTION(platform_osx, t);
   BOX_FUNCTION(platform_windows, t);
+  BOX_FUNCTION(platform_illumos, t);
   BOX_FUNCTION(platform_x86, t);
   BOX_FUNCTION(platform_arm, t);
   BOX_FUNCTION(platform_lp64, t);

@@ -14,6 +14,7 @@ PONY_EXTERN_C_BEGIN
 #define OS_MACOSX_NAME "osx"
 #define OS_WINDOWS_NAME "windows"
 #define OS_POSIX_NAME "posix"
+#define	OS_ILLUMOS_NAME "illumos"
 #define OS_X86_NAME "x86"
 #define OS_ARM_NAME "arm"
 #define OS_LP64_NAME "lp64"

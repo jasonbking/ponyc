@@ -1497,12 +1497,19 @@ bool target_is_windows(char* t)
   return triple.isOSWindows();
 }
 
+bool target_is_illumos(char* t)
+{
+  Triple triple = Triple(t);
+
+  return triple.isOSSolaris();
+}
+
 bool target_is_posix(char* t)
 {
   Triple triple = Triple(t);
 
   return triple.isMacOSX() || triple.isOSFreeBSD() || triple.isOSLinux()
-    || triple.isOSDragonFly();
+    || triple.isOSDragonFly() || triple.isIllumos();
 }
 
 bool target_is_x86(char* t)
