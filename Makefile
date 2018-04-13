@@ -491,6 +491,9 @@ ifeq ($(OSTYPE),illumos)
   ponyc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
   libponycc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
   libponyrt.buildoptions += -D_POSIX_PTHREAD_SEMANTICS
+  libponyc.tests.linkoptions += -lsocket -lnsl
+  libponyc.benchmarks.linkoptions += -lkstat
+  libponyrt.benchmarks.linkoptions += -lkstat
 endif
 
 # target specific build options

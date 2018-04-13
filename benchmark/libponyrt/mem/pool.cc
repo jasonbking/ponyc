@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 #include <platform.h>
 #include <mem/pool.h>
+#include <alloca.h>
 
 #define LARGE_ALLOC ponyint_pool_adjust_size(POOL_MAX + 1)
 
