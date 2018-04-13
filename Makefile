@@ -489,6 +489,7 @@ endif
 
 ifeq ($(OSTYPE),illumos)
   ponyc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
+  libponycc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
   libponyrt.buildoptions += -D_POSIX_PTHREAD_SEMANTICS
 endif
 
