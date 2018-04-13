@@ -1217,7 +1217,6 @@ static void platform_illumos(compile_t* c, reach_type_t* t, token_id cap)
 }
 
 static void platform_x86(compile_t* c, reach_type_t* t, token_id cap)
-static void platform_x86(compile_t* c, reach_type_t* t, token_id cap)
 {
   FIND_METHOD("x86", cap);
   start_function(c, t, m, c->i1, &c_t->use_type, 1);
