@@ -40,8 +40,9 @@ asio_backend_t *ponyint_asio_backend_init()
   return b;
 }
 
-void ponyint_asio_backend_final(asio_backend_t* b __attribute__((unused)))
+void ponyint_asio_backend_final(asio_backend_t* b)
 {
+  port_send(b->port, EV_TERMINATE, NULL);
 }
 
 static void handle_queue(asio_backend_t* b)
@@ -64,7 +65,10 @@ PONY_API void pony_asio_event_resubscribe_read(asio_event_t* ev)
   if((ev == NULL) ||
     (ev->flags == ASIO_DISPOSABLE) ||
     (ev->flags == ASIO_DESTROYED))
+  {
+    pony_assert(0);
     return;
+  }
 
   asio_backend_t* b = ponyint_asio_get_backend();
   pony_assert(b != NULL);
@@ -80,8 +84,10 @@ PONY_API void pony_asio_event_resubscribe_write(asio_event_t* ev)
 {
   if((ev == NULL) ||
     (ev->flags == ASIO_DISPOSABLE) ||
-    (ev->flags == ASIO_DESTROYED))
+    (ev->flags == ASIO_DESTROYED)) {
+    pony_assert(0);
     return;
+  }
 
   asio_backend_t* b = ponyint_asio_get_backend();
   pony_assert(b != NULL);
@@ -111,53 +117,56 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
 
   port_event_t evlist[MAX_EVENTS];
   uint_t n;
+  bool quit = false;
 
-  if (port_getn(b->port, evlist, MAX_EVENTS, &n, NULL) == -1)
-     return NULL;
+  while (!quit) {
+    if (port_getn(b->port, evlist, MAX_EVENTS, &n, NULL) == -1)
+       return NULL;
 
-  for (uint_t i = 0; i < n; i++)
-  {
-    port_event_t *pev = &evlist[i];
-    asio_event_t *ev = pev->portev_user;
-    uint32_t flags = 0;
-
-    switch(pev->portev_source)
+    for (uint_t i = 0; i < n; i++)
     {
-      case PORT_SOURCE_FD:
-        if (pev->portev_events & POLLIN)
-        {
-          ev->readable = true;
-          flags |= ASIO_READ;
-        }
-        if (pev->portev_events & POLLOUT)
-        {
-          ev->writeable = true;
-          flags |= ASIO_WRITE;
-        }
-        if (flags)
-        {
-          pony_asio_event_send(ev, flags, 0);
-        }
-        break;
-      case PORT_SOURCE_TIMER:
-        if (ev->flags & ASIO_TIMER)
-        {
-          pony_asio_event_send(ev, ASIO_TIMER, 0);
-        }
-        break;
-      case PORT_SOURCE_USER:
-        switch (pev->portev_events)
-        {
-          case EV_TERMINATE:
-            close(b->port);
-            b->port = -1;
-            break;
-        }
-        break;
+      port_event_t *pev = &evlist[i];
+      asio_event_t *ev = pev->portev_user;
+      uint32_t flags = 0;
+
+      switch(pev->portev_source)
+      {
+        case PORT_SOURCE_FD:
+          if (pev->portev_events & POLLIN)
+          {
+            ev->readable = true;
+            flags |= ASIO_READ;
+          }
+          if (pev->portev_events & POLLOUT)
+          {
+            ev->writeable = true;
+            flags |= ASIO_WRITE;
+          }
+          if (flags)
+          {
+            pony_asio_event_send(ev, flags, 0);
+          }
+          break;
+        case PORT_SOURCE_TIMER:
+          if (ev->flags & ASIO_TIMER)
+          {
+            pony_asio_event_send(ev, ASIO_TIMER, 0);
+          }
+          break;
+        case PORT_SOURCE_USER:
+          switch (pev->portev_events)
+          {
+            case EV_TERMINATE:
+              close(b->port);
+              b->port = -1;
+              quit = true;
+              break;
+          }
+          break;
+      }
+
+      handle_queue(b);
     }
-
-    handle_queue(b);
-
   }
 
   ponyint_messageq_destroy(&b->q);
@@ -200,8 +209,93 @@ PONY_API void pony_asio_event_subscribe(asio_event_t* ev)
     port_associate(b->port, PORT_SOURCE_FD, ev->fd, events, ev);
   }
 
-  /* XXX: TODO */
+  if (ev->flags & ASIO_TIMER)
+  {
+    /* TODO */
+  }
+
+  if (ev->flags & ASIO_SIGNAL)
+  {
+    /* TODO */
+  }
 }
 
+PONY_API void pony_asio_event_setnsec(asio_event_t* ev, uint64_t nsec __attribute__((unused)))
+{
+  if((ev == NULL) ||
+    (ev->magic != ev) ||
+    (ev->flags == ASIO_DISPOSABLE) ||
+    (ev->flags == ASIO_DESTROYED))
+  {
+    pony_assert(0);
+    return;
+  }
+
+  asio_backend_t* b __attribute__((unused)) = ponyint_asio_get_backend();
+  pony_assert(b != NULL);
+
+  /* TODO */
+}
+
+PONY_API void pony_asio_event_unsubscribe(asio_event_t* ev)
+{
+  if((ev == NULL) ||
+    (ev->magic != ev) ||
+    (ev->flags == ASIO_DISPOSABLE) ||
+    (ev->flags == ASIO_DESTROYED))
+  {
+    pony_assert(0);
+    return;
+  }
+
+  asio_backend_t* b = ponyint_asio_get_backend();
+  pony_assert(b != NULL);
+
+  if(ev->noisy)
+  {
+    uint64_t old_count = ponyint_asio_noisy_remove();
+    // tell scheduler threads that asio has no noisy actors
+    // if the old_count was 1
+    if (old_count == 1)
+    {
+      ponyint_sched_unnoisy_asio(SPECIAL_THREADID_EVPORT);
+
+      // maybe wake up a scheduler thread if they've all fallen asleep
+      ponyint_sched_maybe_wakeup_if_all_asleep(-1);
+    }
+
+    ev->noisy = false;
+  }
+
+  // XXX: This removes all events -- if it's possible that we just want to
+  // remove either the POLLIN or POLLOUT, this needs to be smarter and possibly
+  // reassociate with a modified set
+  if(ev->flags & (ASIO_READ|ASIO_WRITE))
+  {
+    port_dissociate(b->port, PORT_SOURCE_FD, ev->fd);
+  }
+
+  if(ev->flags & ASIO_TIMER)
+  {
+    /* TODO */
+  }
+
+  if (ev->flags & ASIO_SIGNAL)
+  {
+    /* TODO */
+  }
+
+  ev->flags = ASIO_DISPOSABLE;
+
+  asio_msg_t* msg = (asio_msg_t*)pony_alloc_msg(
+    POOL_INDEX(sizeof(asio_msg_t)), 0);
+  msg->event = ev;
+  msg->flags = ASIO_DISPOSABLE;
+  ponyint_thread_messageq_push(&b->q, (pony_msg_t*)msg, (pony_msg_t*)msg
+#ifdef USE_DYNAMIC_TRACE
+    , SPECIAL_THREADID_KQUEUE, SPECIAL_THREADID_KQUEUE
+#endif
+    );
+}
 
 #endif
