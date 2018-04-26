@@ -425,7 +425,7 @@ include.paths := $(shell echo | $(CC) -v -E - 2>&1)
 ifeq (,$(findstring $(llvm.include.dir),$(include.paths)))
 # LLVM include directory is not in the existing paths;
 # put it at the top of the system list
-llvm.include := -isystem $(llvm.include.dir)
+llvm.include := -isystem $(llvm.include.dir) -I $(shell $(LLVM_CONFIG) --cppflags)
 else
 # LLVM include directory is already on the existing paths;
 # do nothing
