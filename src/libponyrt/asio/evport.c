@@ -120,6 +120,7 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
   bool quit = false;
 
   while (!quit) {
+    n = 1;
     if (port_getn(b->port, evlist, MAX_EVENTS, &n, NULL) == -1)
        return NULL;
 

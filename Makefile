@@ -222,6 +222,10 @@ ifeq ($(OSTYPE),osx)
   ALL_CXXFLAGS += -stdlib=libc++ -mmacosx-version-min=10.8
 endif
 
+ifeq ($(OSTYPE),illumos)
+  ALL_CFLAGS += -DUSE_SCHEDULER_SCALING_PTHREADS
+endif
+
 ifndef LLVM_CONFIG
   ifneq (,$(shell which /usr/local/opt/llvm/bin/llvm-config 2> /dev/null))
     LLVM_CONFIG = /usr/local/opt/llvm/bin/llvm-config
@@ -488,8 +492,6 @@ ifneq (,$(filter $(OSTYPE), osx bsd))
 endif
 
 ifeq ($(OSTYPE),illumos)
-  ponyc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
-  libponycc.buildoptions += -D_GLIBCXX_USE_CXX11_ABI
   libponyrt.buildoptions += -D_POSIX_PTHREAD_SEMANTICS
   libponyc.tests.linkoptions += -lsocket -lnsl
   libponyc.benchmarks.linkoptions += -lkstat

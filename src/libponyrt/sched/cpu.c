@@ -15,6 +15,8 @@
   #include <mach/thread_policy.h>
 #elif defined(PLATFORM_IS_WINDOWS)
   #include <processtopologyapi.h>
+#elif defined(PLATFORM_IS_ILLUMOS)
+  #include <unistd.h>
 #endif
 
 #include "cpu.h"
@@ -186,6 +188,9 @@ void ponyint_cpu_init()
 
   if(ptr != NULL)
     ponyint_pool_free_size(len, ptr);
+#elif defined(PLATFORM_IS_ILLUMOS)
+  long count = sysconf(_SC_NPROCESSORS_ONLN);
+  hw_cpu_count = (uint32_t)count;
 #endif
 }
 
