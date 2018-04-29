@@ -6,6 +6,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef PLATFORM_IS_ILLUMOS
+#include <sys/avl.h>
+#include <sys/queue.h>
+#endif
+
 PONY_EXTERN_C_BEGIN
 
 /** Definiton of an ASIO event.
@@ -36,6 +41,14 @@ typedef struct asio_event_t
 #ifdef PLATFORM_IS_WINDOWS
   HANDLE timer;         /* timer handle */
 #endif
+
+#ifdef PLATFORM_IS_ILLUMOS
+  STAILQ_ENTRY(asio_event_t) siglink;	/* link for signal */
+  avl_node_t timer_node;		/* avl node for timers */
+  hrtime_t timer_expire;		/* when timer expires */
+  int evport;
+#endif
+
 } asio_event_t;
 
 /// Message that carries an event and event flags.

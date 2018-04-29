@@ -492,10 +492,12 @@ ifneq (,$(filter $(OSTYPE), osx bsd))
 endif
 
 ifeq ($(OSTYPE),illumos)
+  ponyc.linkoptions += -lavl
   libponyrt.buildoptions += -D_POSIX_PTHREAD_SEMANTICS
-  libponyc.tests.linkoptions += -lsocket -lnsl
+  libponyc.tests.linkoptions += -lavl -lsocket -lnsl
+  libponyrt.tests.linkoptions += -lavl
   libponyc.benchmarks.linkoptions += -lkstat
-  libponyrt.benchmarks.linkoptions += -lkstat
+  libponyrt.benchmarks.linkoptions += -lkstat -lavl
 endif
 
 # target specific build options

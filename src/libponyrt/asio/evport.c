@@ -7,6 +7,7 @@
 #include "../sched/cpu.h"
 #include "../sched/scheduler.h"
 #include "ponyassert.h"
+#include <sys/avl.h>
 #include <sys/debug.h>
 #include <sys/queue.h>
 #include <string.h>
@@ -16,7 +17,9 @@
 #include <signal.h>
 #include <poll.h>
 #include <port.h>
+#include <time.h>
 
+// User defined events
 #define EV_TERMINATE  1
 #define	EV_SIGNAL 2
 
@@ -36,6 +39,8 @@ struct asio_backend_t
 {
   int         ab_port;
   messageq_t  ab_q;
+  timer_t     ab_timerid;
+  avl_tree_t  ab_timers;
 };
 
 // Since event ports do not support signals as an event type, we have to fake
@@ -45,17 +50,10 @@ struct asio_backend_t
 // indexed by signal number for any registered events.  It then generates
 // a user event (of type EV_SIGNAL) and sends the event to the corresponding
 // event port for handling.
-
-typedef struct asio_sigevt {
-  STAILQ_ENTRY(asio_sigevt) asevt_link;
-  asio_event_t*             asevt_evtp;
-  int                       asevt_port;
-} asio_sigevt_t;
-STAILQ_HEAD(asio_sigevt_list, asio_sigevt);
-
+STAILQ_HEAD(asio_signal_list, asio_event_t);
 typedef struct asio_sigtbl {
   pthread_mutex_t         atbl_lock;
-  struct asio_sigevt_list atbl_evlist;
+  struct asio_signal_list atbl_evlist;
 } asio_sigtbl_t;
 static asio_sigtbl_t asio_sigtbl[NSIG];
 
@@ -81,7 +79,7 @@ static void* asio_signal_thread(void* arg __unused)
     VERIFY3S(signo, <, NSIG);
 
     asio_sigtbl_t*  tbl = &asio_sigtbl[signo];
-    asio_sigevt_t*  asevt;
+    asio_event_t*   ev;
 
     VERIFY0(pthread_mutex_lock(&tbl->atbl_lock));
 
@@ -91,9 +89,9 @@ static void* asio_signal_thread(void* arg __unused)
       continue;
     }
 
-    STAILQ_FOREACH(asevt, &tbl->atbl_evlist, asevt_link)
+    STAILQ_FOREACH(ev, &tbl->atbl_evlist, siglink)
     {
-      port_send(asevt->asevt_port, EV_SIGNAL, asevt->asevt_evtp);
+      port_send(ev->evport, EV_SIGNAL, ev);
     }
 
     VERIFY0(pthread_mutex_unlock(&tbl->atbl_lock));
@@ -131,56 +129,119 @@ static void asio_signal_add(asio_backend_t* be, asio_event_t* ev, int signo)
   VERIFY3U(signo, <, NSIG);
 
   asio_sigtbl_t*  tbl = &asio_sigtbl[signo];
-  asio_sigevt_t*  asevt = POOL_ALLOC(asio_sigevt_t);
 
-  asevt->asevt_port = be->ab_port;
-  asevt->asevt_evtp = ev;
+  ev->evport = be->ab_port;
+  ev->nsec = signo;
 
   VERIFY0(pthread_mutex_lock(&tbl->atbl_lock));
-  STAILQ_INSERT_TAIL(&tbl->atbl_evlist, asevt, asevt_link);
+  STAILQ_INSERT_TAIL(&tbl->atbl_evlist, ev, siglink);
   VERIFY0(pthread_mutex_unlock(&tbl->atbl_lock));
 }
 
-static void asio_signal_remove(const asio_event_t* ev, int signo)
+static void asio_signal_remove(const asio_event_t* ev)
 {
-  VERIFY3U(signo, >, 0);
-  VERIFY3U(signo, <, NSIG);
+  VERIFY3U(ev->nsec, >, 0);
+  VERIFY3U(ev->nsec, <, NSIG);
 
-  asio_sigtbl_t*  tbl = &asio_sigtbl[signo];
-  asio_sigevt_t*  asevt;
-  asio_sigevt_t*  np;
+  asio_sigtbl_t*  tbl = &asio_sigtbl[ev->nsec];
 
   VERIFY0(pthread_mutex_lock(&tbl->atbl_lock));
-  STAILQ_FOREACH_SAFE(asevt, &tbl->atbl_evlist, asevt_link, np)
-  {
-    if (asevt->asevt_evtp == ev)
-    {
-      STAILQ_REMOVE(&tbl->atbl_evlist, asevt, asio_sigevt, asevt_link);
-      break;
-    }
-  }
+  STAILQ_REMOVE(&tbl->atbl_evlist, ev, asio_event_t, siglink);
   VERIFY0(pthread_mutex_unlock(&tbl->atbl_lock));
 }
 
 static void asio_signal_remove_backend(const asio_backend_t *b)
 {
   asio_sigtbl_t*  tbl;
-  asio_sigevt_t*  asevt;
-  asio_sigevt_t*  np;
+  asio_event_t*   ev;
+  asio_event_t*   np;
   size_t          i;
   int             port = b->ab_port;
 
   for(i = 0, tbl = asio_sigtbl; i < NSIG; i++, tbl++)
   {
     VERIFY0(pthread_mutex_lock(&tbl->atbl_lock));
-    STAILQ_FOREACH_SAFE(asevt, &tbl->atbl_evlist, asevt_link, np)
+    STAILQ_FOREACH_SAFE(ev, &tbl->atbl_evlist, siglink, np)
     {
-      if (asevt->asevt_port == port)
+      if (ev->evport == port)
       {
-        STAILQ_REMOVE(&tbl->atbl_evlist, asevt, asio_sigevt, asevt_link);
+        STAILQ_REMOVE(&tbl->atbl_evlist, ev, asio_event_t, siglink);
       }
     }
     VERIFY0(pthread_mutex_unlock(&tbl->atbl_lock));
+  }
+}
+
+static int asio_timer_cmp(const void* a, const void* b)
+{
+  const asio_event_t* l = a;
+  const asio_event_t* r = b;
+
+  if (l->timer_expire < r->timer_expire)
+  {
+    return -1;
+  }
+  if (l->timer_expire > r->timer_expire)
+  {
+    return 1;
+  }
+
+  // Multiple timers could expire at the same time, so sort by address
+  // if they are
+  if ((uintptr_t)l < (uintptr_t)r)
+  {
+    return -1;
+  }
+  if ((uintptr_t)l > (uintptr_t)r)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+static void
+ponyint_asio_timer_arm(asio_backend_t* b)
+{
+  struct itimerspec it;
+  asio_event_t *ev = avl_first(&b->ab_timers);
+
+  if (ev == NULL)
+  {
+    return;
+  }
+
+  memset(&it, 0, sizeof (it));
+  it.it_value.tv_sec = (time_t)(ev->timer_expire / NANOSEC);
+  it.it_value.tv_nsec = (long int)(ev->timer_expire % NANOSEC);
+  VERIFY0(timer_settime(b->ab_timerid, TIMER_ABSTIME, &it, NULL));
+}
+
+static void
+ponyint_asio_timer_fire(asio_backend_t* b)
+{
+  hrtime_t now = gethrtime();
+
+  for(;;) {
+    asio_event_t* ev = avl_first(&b->ab_timers);
+
+    if (ev == NULL || ev->timer_expire > now)
+    {
+      break;
+    }
+
+    avl_remove(&b->ab_timers, ev);
+
+    if (ev->flags & ASIO_TIMER)
+    {
+      pony_asio_event_send(ev, ASIO_TIMER, 0);
+
+      if (!(ev->flags & ASIO_ONESHOT))
+      {
+        ev->timer_expire = gethrtime() + ev->nsec;
+        avl_add(&b->ab_timers, ev);
+      }
+    }
   }
 }
 
@@ -189,6 +250,8 @@ asio_backend_t* ponyint_asio_backend_init()
   VERIFY0(pthread_once(&asio_signal_once, asio_signal_init));
 
   asio_backend_t* b = POOL_ALLOC(asio_backend_t);
+  port_notify_t pn;
+  struct sigevent evp;
 
   memset(b, 0, sizeof(asio_backend_t));
   ponyint_messageq_init(&b->ab_q);
@@ -200,6 +263,21 @@ asio_backend_t* ponyint_asio_backend_init()
     POOL_FREE(asio_backend_t, b);
     return NULL;
   }
+
+  pn.portnfy_port = b->ab_port;
+  pn.portnfy_user = NULL;
+  evp.sigev_notify = SIGEV_PORT;
+  evp.sigev_value.sival_ptr = &pn;
+
+  if (timer_create(CLOCK_MONOTONIC, &evp, &b->ab_timerid) != 0)
+  {
+    close(b->ab_port);
+    POOL_FREE(asio_backend_t, b);
+    return NULL;
+  }
+
+  avl_create(&b->ab_timers, asio_timer_cmp, sizeof(asio_event_t),
+    offsetof(asio_event_t, timer_node));
 
   return b;
 }
@@ -240,7 +318,7 @@ PONY_API void pony_asio_event_resubscribe_read(asio_event_t* ev)
   if ((ev->flags & ASIO_READ) && !ev->readable)
   {
       /* XXX: return value? */
-      port_associate(b->ab_port, PORT_SOURCE_FD, ev->fd, POLLIN, ev);
+      port_associate(b->ab_port, PORT_SOURCE_FD, ev->fd, POLLRDNORM, ev);
   }
 }
 
@@ -291,7 +369,7 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       switch(pev->portev_source)
       {
         case PORT_SOURCE_FD:
-          if (pev->portev_events & POLLIN)
+          if (pev->portev_events & POLLRDNORM)
           {
             ev->readable = true;
             flags |= ASIO_READ;
@@ -307,7 +385,9 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
           }
           break;
         case PORT_SOURCE_TIMER:
-          if (ev->flags & ASIO_TIMER)
+          ponyint_asio_timer_fire(b);
+          break;
+        if (ev->flags & ASIO_TIMER)
           {
             pony_asio_event_send(ev, ASIO_TIMER, 0);
           }
@@ -377,7 +457,9 @@ PONY_API void pony_asio_event_subscribe(asio_event_t* ev)
 
   if (ev->flags & ASIO_TIMER)
   {
-    /* TODO */
+    ev->timer_expire = gethrtime() + ev->nsec;
+    avl_add(&b->ab_timers, ev);
+    ponyint_asio_timer_arm(b);
   }
 
   if (ev->flags & ASIO_SIGNAL)
@@ -386,7 +468,7 @@ PONY_API void pony_asio_event_subscribe(asio_event_t* ev)
   }
 }
 
-PONY_API void pony_asio_event_setnsec(asio_event_t* ev, uint64_t nsec __attribute__((unused)))
+PONY_API void pony_asio_event_setnsec(asio_event_t* ev, uint64_t nsec)
 {
   if((ev == NULL) ||
     (ev->magic != ev) ||
@@ -397,10 +479,14 @@ PONY_API void pony_asio_event_setnsec(asio_event_t* ev, uint64_t nsec __attribut
     return;
   }
 
-  asio_backend_t* b __attribute__((unused)) = ponyint_asio_get_backend();
+  asio_backend_t* b = ponyint_asio_get_backend();
   pony_assert(b != NULL);
 
-  /* TODO */
+  avl_remove(&b->ab_timers, ev);
+  ev->timer_expire = gethrtime() + nsec;
+  ev->nsec = nsec;
+  avl_add(&b->ab_timers, ev);
+  ponyint_asio_timer_arm(b);
 }
 
 PONY_API void pony_asio_event_unsubscribe(asio_event_t* ev)
@@ -443,12 +529,14 @@ PONY_API void pony_asio_event_unsubscribe(asio_event_t* ev)
 
   if(ev->flags & ASIO_TIMER)
   {
-    /* TODO */
+    avl_remove(&b->ab_timers, ev);
+    ponyint_asio_timer_arm(b);
+    ev->timer_expire = -1;
   }
 
   if (ev->flags & ASIO_SIGNAL)
   {
-     asio_signal_remove(ev, (int)ev->nsec);
+     asio_signal_remove(ev);
   }
 
   ev->flags = ASIO_DISPOSABLE;

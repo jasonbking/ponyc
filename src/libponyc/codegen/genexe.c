@@ -353,11 +353,13 @@ static bool link_exe(compile_t* c, ast_t* program,
     "";
 #endif
   const char* nsl = target_is_illumos(c->opt->triple) ? "-lsocket -lnsl" : "";
+  const char* avl = target_is_illumos(c->opt->triple) ? "-lavl" : "";
 
   size_t ld_len = 512 + strlen(file_exe) + strlen(file_o) + strlen(lib_args)
                   + strlen(arch) + strlen(mcx16_arg) + strlen(fuseld)
                   + strlen(ldl) + strlen(atomic) + strlen(staticbin)
-                  + strlen(dtrace_args) + strlen(lexecinfo) + strlen(nsl);
+                  + strlen(dtrace_args) + strlen(lexecinfo) + strlen(nsl) +
+                  + strlen(avl);
 
   char* ld_cmd = (char*)ponyint_pool_alloc_size(ld_len);
 
@@ -372,9 +374,9 @@ static bool link_exe(compile_t* c, ast_t* program,
     // for backtrace reporting.
     "-rdynamic "
 #endif
-    "%s %s %s %s %s -lpthread %s %s %s -lm %s %s",
+    "%s %s %s %s %s -lpthread %s %s %s -lm %s %s %s",
     linker, file_exe, arch, mcx16_arg, atomic, staticbin, fuseld, file_o,
-    lib_args, dtrace_args, ponyrt, ldl, lexecinfo, nsl
+    lib_args, dtrace_args, ponyrt, ldl, lexecinfo, nsl, avl
     );
 
   if(c->opt->verbosity >= VERBOSITY_TOOL_INFO)
