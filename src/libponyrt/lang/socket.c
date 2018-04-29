@@ -82,6 +82,13 @@ typedef int SOCKET;
 
 PONY_EXTERN_C_BEGIN
 
+#ifdef PLATFORM_IS_ILLUMOS
+// Technically, no platform documents freeaddrinfo as accepting NULL as
+// an argument, unfortunately, Linux and FreeBSD at least seem to no care
+// while illumos does.
+#define freeaddrinfo(x) if (x != NULL) freeaddrinfo(x)
+#endif
+
 PONY_API void pony_os_socket_close(int fd);
 
 // This must match the pony NetAddress type in packages/net.

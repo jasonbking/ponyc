@@ -109,6 +109,7 @@ static void asio_signal_init()
   {
     memset(&asio_sigtbl[i], 0, sizeof (struct asio_sigtbl));
     VERIFY0(pthread_mutex_init(&asio_sigtbl[i].atbl_lock, NULL));
+    STAILQ_INIT(&asio_sigtbl[i].atbl_evlist);
   }
 
   VERIFY0(pthread_attr_init(&attr));
