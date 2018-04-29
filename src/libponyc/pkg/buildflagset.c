@@ -17,6 +17,7 @@ static const char* _os_flags[] =
   OS_LINUX_NAME,
   OS_MACOSX_NAME,
   OS_WINDOWS_NAME,
+  OS_ILLUMOS_NAME,
   "unknown_OS",
   NULL  // Terminator.
 };

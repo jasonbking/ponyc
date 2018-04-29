@@ -115,7 +115,7 @@
 /** The platform's programming model.
  *
  */
-#if defined(__LP64__)
+#if defined(__LP64__) || (defined(PLATFORM_IS_ILLUMOS) && defined(_LP64))
 #  define PLATFORM_IS_LP64
 #elif defined(_WIN64)
 #  define PLATFORM_IS_LLP64
@@ -179,7 +179,7 @@
 # endif
 #elif defined(__i386__) || defined(_M_IX86) || defined(_X86_) || \
  defined(__amd64__) || defined(__x86_64__) || defined(_M_X64) || \
- defined(_M_AMD64)
+ defined(_M_AMD64) || defined(__x86)
 # define PLATFORM_IS_X86
 #endif
 

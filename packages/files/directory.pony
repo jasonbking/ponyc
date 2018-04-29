@@ -97,7 +97,7 @@ class Directory
         end
 
         let h =
-          ifdef linux or bsd then
+          ifdef linux or bsd or illumos then
             let fd =
               @openat[I32](fd', ".".cstring(),
                 @ponyint_o_rdonly()
@@ -157,7 +157,7 @@ class Directory
 
     let path' = FilePath(path, target, path.caps)?
 
-    ifdef linux or bsd then
+    ifdef linux or bsd or illumos then
       let fd' =
         @openat[I32](_fd, target.cstring(),
           @ponyint_o_rdonly()
@@ -184,7 +184,7 @@ class Directory
     try
       let path' = FilePath(path, target, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         var offset: ISize = 0
 
         repeat
@@ -223,7 +223,7 @@ class Directory
 
     let path' = FilePath(path, target, path.caps)?
 
-    ifdef linux or bsd then
+    ifdef linux or bsd or illumos then
       let fd' =
         @openat[I32](_fd, target.cstring(),
           @ponyint_o_rdwr()
@@ -248,7 +248,7 @@ class Directory
 
     let path' = FilePath(path, target, path.caps - FileWrite)?
 
-    ifdef linux or bsd then
+    ifdef linux or bsd or illumos then
       let fd' =
         @openat[I32](_fd, target.cstring(),
           @ponyint_o_rdonly() or @ponyint_o_cloexec(),
@@ -304,7 +304,7 @@ class Directory
 
     let path' = FilePath(path, target, path.caps)?
 
-    ifdef linux or bsd then
+    ifdef linux or bsd or illumos then
       FileInfo._relative(_fd, path', target)?
     else
       FileInfo(path')?
@@ -325,7 +325,7 @@ class Directory
     try
       let path' = FilePath(path, target, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         0 == @fchmodat[I32](_fd, target.cstring(), mode._os(), I32(0))
       else
         path'.chmod(mode)
@@ -349,7 +349,7 @@ class Directory
     try
       let path' = FilePath(path, target, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         0 == @fchownat[I32](_fd, target.cstring(), uid, gid, I32(0))
       else
         path'.chown(uid, gid)
@@ -385,7 +385,7 @@ class Directory
     try
       let path' = FilePath(path, target, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         var tv: (ILong, ILong, ILong, ILong) =
           ( atime._1.ilong(), atime._2.ilong() / 1000,
             mtime._1.ilong(), mtime._2.ilong() / 1000 )
@@ -416,7 +416,7 @@ class Directory
     try
       let path' = FilePath(path, link_name, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         0 == @symlinkat[I32](source.path.cstring(), _fd, link_name.cstring())
       else
         source.symlink(path')
@@ -441,7 +441,7 @@ class Directory
     try
       let path' = FilePath(path, target, path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         let fi = FileInfo(path')?
 
         if fi.directory and not fi.symlink then
@@ -484,7 +484,7 @@ class Directory
       let path' = FilePath(path, source, path.caps)?
       let path'' = FilePath(to.path, target, to.path.caps)?
 
-      ifdef linux or bsd then
+      ifdef linux or bsd or illumos then
         0 == @renameat[I32](_fd, source.cstring(), to._fd, target.cstring())
       else
         path'.rename(path'')
