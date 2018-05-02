@@ -49,7 +49,7 @@ class Directory
 
     path = from
 
-    ifdef posix then
+    ifdef posix or illumos then
       _fd =
         @open[I32](from.path.cstring(),
           @ponyint_o_rdonly()
@@ -91,7 +91,7 @@ class Directory
     recover
       let list = Array[String]
 
-      ifdef posix then
+      ifdef posix or illumos then
         if fd' == -1 then
           error
         end
