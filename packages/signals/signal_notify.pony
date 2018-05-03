@@ -21,7 +21,7 @@ primitive SignalRaise
   Raise a signal.
   """
   fun apply(sig: U32) =>
-    ifdef osx then
+    ifdef osx or illumos then
       // On Darwin, @raise delivers the signal to the current thread, not the
       // process, but kqueue EVFILT_SIGNAL will only see signals delivered to
       // the process. @kill delivers the signal to a specific process.
