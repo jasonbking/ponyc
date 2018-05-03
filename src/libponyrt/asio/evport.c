@@ -319,7 +319,7 @@ PONY_API void pony_asio_event_resubscribe_read(asio_event_t* ev)
   if ((ev->flags & ASIO_READ) && !ev->readable)
   {
       /* XXX: return value? */
-      port_associate(b->ab_port, PORT_SOURCE_FD, ev->fd, POLLRDNORM, ev);
+      port_associate(b->ab_port, PORT_SOURCE_FD, ev->fd, POLLIN, ev);
   }
 }
 
@@ -370,7 +370,7 @@ DECLARE_THREAD_FN(ponyint_asio_backend_dispatch)
       switch(pev->portev_source)
       {
         case PORT_SOURCE_FD:
-          if (pev->portev_events & POLLRDNORM)
+          if (pev->portev_events & POLLIN)
           {
             ev->readable = true;
             flags |= ASIO_READ;
