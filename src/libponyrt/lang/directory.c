@@ -15,6 +15,10 @@
 #include <stdlib.h>
 #endif
 
+#if defined(PLATFORM_IS_ILLUMOS)
+#include <sys/param.h>
+#endif
+
 #ifdef USE_VALGRIND
 #include <valgrind/helgrind.h>
 #endif
@@ -53,8 +57,10 @@ PONY_API char* pony_os_cwd()
     char* cwd_alloc;
 #if defined(PLATFORM_IS_WINDOWS)
     cwd_alloc = _getcwd(NULL, 0);
-#else
+#elif !defined(PLATFORM_IS_ILLUMOS)
     cwd_alloc = getcwd(NULL, 0);
+#else
+    cwd_alloc = getcwd(NULL, MAXPATHLEN);
 #endif
 
     if(cwd_alloc == NULL)
