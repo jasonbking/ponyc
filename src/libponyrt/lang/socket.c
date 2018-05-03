@@ -171,7 +171,8 @@ static struct addrinfo* os_addrinfo_intern(int family, int socktype,
   return result;
 }
 
-#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_BSD) || defined(PLATFORM_IS_ILLUMOS)
+#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_BSD) || \
+    defined(PLATFORM_IS_ILLUMOS)
 static int set_nonblocking(int s)
 {
   int flags = fcntl(s, F_GETFL, 0);
@@ -498,7 +499,8 @@ static int socket_from_addrinfo(struct addrinfo* p, bool reuse)
       (const char*)&reuseaddr, sizeof(int));
   }
 
-#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_BSD)
+#if defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_BSD) || \
+    defined(PLATFORM_IS_ILLUMOS)
   r |= set_nonblocking(fd);
 #endif
 
@@ -1076,7 +1078,8 @@ PONY_API void pony_os_keepalive(int fd, int secs)
   if(on == 0)
     return;
 
-#if defined(PLATFORM_IS_LINUX) || defined(PLATFORM_IS_BSD) || defined(PLATFORM_IS_MACOSX)
+#if defined(PLATFORM_IS_LINUX) || defined(PLATFORM_IS_BSD) || \
+    defined(PLATFORM_IS_MACOSX) || defined(PLATFORM_IS_ILLUMOS)
   int probes = secs / 2;
   setsockopt(s, IPPROTO_TCP, TCP_KEEPCNT, &probes, sizeof(int));
 
