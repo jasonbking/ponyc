@@ -152,7 +152,7 @@ static struct addrinfo* os_addrinfo_intern(int family, int socktype,
 {
   struct addrinfo hints;
   memset(&hints, 0, sizeof(struct addrinfo));
-  hints.ai_flags = AI_ADDRCONFIG;
+  hints.ai_flags = 0;
   hints.ai_family = family;
   hints.ai_socktype = socktype;
   hints.ai_protocol = proto;
